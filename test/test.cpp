@@ -1,4 +1,4 @@
-﻿#include <SFML/Graphics.hpp>
+#include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
 #include <ctime>
 #include <cstdlib>
@@ -20,13 +20,13 @@ struct Point {
 } a[4], b[4]; // Mảng a và b đại diện cho vị trí các khối hiện tại
 
 int figures[7][4] = {
-    1, 3, 5, 7, // I
-    2, 4, 5, 7, // Z
-    3, 5, 4, 6, // S
-    3, 5, 4, 7, // T
-    2, 3, 5, 7, // L
-    3, 5, 7, 6, // J
-    2, 3, 4, 5  // O
+    {1, 3, 5, 7}, // I
+    {2, 4, 5, 7}, // Z
+    {3, 5, 4, 6}, // S
+    {3, 5, 4, 7}, // T
+    {2, 3, 5, 7}, // L
+    {3, 5, 7, 6}, // J
+    {2, 3, 4, 5}  // O
 };
 
 const int pieceColors[7] = {
@@ -61,10 +61,10 @@ int currentPiece, nextPiece; // Mảnh hiện tại và tiếp theo
 bool isGameOver = false;
 bool isMusicOn = true;
 
-sf::SoundBuffer startBuffer, holdBuffer, placeBuffer, lineClearBuffer, gameOverBuffer, pauseBuffer, xoayBuffer, buttonBuffer;
-sf::Sound startSound, holdSound, placeSound, lineClearSound, gameOverSound, pauseSound, xoaySound, buttonSound;
+SoundBuffer startBuffer, holdBuffer, placeBuffer, lineClearBuffer, gameOverBuffer, pauseBuffer, xoayBuffer, buttonBuffer;
+Sound startSound, holdSound, placeSound, lineClearSound, gameOverSound, pauseSound, xoaySound, buttonSound;
 
-sf::Music backgroundMusic;
+Music backgroundMusic;
 
 // Hàm reset game
 void resetGame() {
@@ -85,9 +85,10 @@ void resetGame() {
     currentPiece = nextPiece; // Mảnh hiện tại
     nextPiece = rand() % 7;   // Mảnh tiếp theo
     int n = currentPiece;
+    int offsetXForPiece = N / 2 - 1; // Căn giữa cho khối rơi
     for (int i = 0; i < 4; i++) {
-        a[i].x = figures[n][i] % 2; // Tính tọa độ x của khối
-        a[i].y = figures[n][i] / 2; // Tính tọa độ y của khối
+        a[i].x = figures[n][i] % 2 + offsetXForPiece; // Cộng offset vào tọa độ x
+        a[i].y = figures[n][i] / 2; // Tọa độ y 
     }
     canHold = true;
     isHolding = false; // Đánh dấu chưa hold
@@ -127,11 +128,14 @@ int main() {
 
     RenderWindow window(VideoMode(600, 720), "Tetris");
 
-    Texture t1, t2;
+    Texture t1, t2, waitingTexture, pauseTexture, GOTEXTURE;
     t1.loadFromFile("../data/block.png");
     t2.loadFromFile("../data/BG.png");
+    waitingTexture.loadFromFile("../data/start_screen.png");
+    pauseTexture.loadFromFile("../data/Pause Screen.png");
+    GOTEXTURE.loadFromFile("../data/GameOVer Screen.png");
 
-    Sprite s(t1), background(t2);
+    Sprite s(t1), background(t2), waitingSprite(waitingTexture), pauseSprite(pauseTexture), GOSprite(GOTEXTURE);
 
     int dx = 0;
     bool rotate = false;
@@ -165,13 +169,49 @@ int main() {
             if (e.type == Event::Closed)
                 window.close();
 
-            if (e.key.code == Keyboard::R && isPaused) {
-                resetGame();        // Reset lại trò chơi
-                isPaused = false;   // Bỏ trạng thái tạm dừng
-                countdownActive = true; // Bắt đầu đếm ngược
-                countdownTime = 3.0f;   // Đặt lại thời gian đếm ngược
-                countdownClock.restart(); // Khởi động đồng hồ đếm ngược
-                buttonSound.play();
+            if (e.type == e.MouseButtonPressed && e.mouseButton.button == Mouse::Left && isPaused) {
+                Vector2i mousePos = Mouse::getPosition(window);
+                int MouseX = mousePos.x;
+                int MouseY = mousePos.y;
+                if (MouseX >= 164 && MouseY >= 356 && MouseX <= 439 && MouseY <= 417) {
+                    resetGame();        // Reset lại trò chơi
+                    isPaused = false;   // Bỏ trạng thái tạm dừng
+                    countdownActive = true; // Bắt đầu đếm ngược
+                    countdownTime = 3.0f;   // Đặt lại thời gian đếm ngược
+                    countdownClock.restart(); // Khởi động đồng hồ đếm ngược
+                    buttonSound.play();
+                }
+                else if (MouseX >= 164 && MouseY >= 260 && MouseX <= 439 && MouseY <= 321) {
+                    countdownActive = true; // Kích hoạt đếm ngược
+                    countdownTime = 3.0f;   // Đặt lại thời gian đếm ngược
+                    countdownClock.restart(); // Khởi động đồng hồ đếm ngược
+                    buttonSound.play();
+                }
+                else if (MouseX >= 164 && MouseY >= 448 && MouseX <= 439 && MouseY <= 509) {
+                    isMusicOn = !isMusicOn; // Đảo ngược trạng thái âm nhạc (bật <-> tắt)
+                    if (isMusicOn) {
+                        backgroundMusic.play();   // Bật nhạc
+                    }
+                    else {
+                        backgroundMusic.pause();  // Tắt nhạc
+                    }
+                    buttonSound.play();
+                }
+            }
+
+            if (e.type == e.MouseButtonPressed && e.mouseButton.button == Mouse::Left && !isplaying) {
+                Vector2i mousePos = Mouse::getPosition(window);
+                int MouseX = mousePos.x;
+                int MouseY = mousePos.y;
+                if (MouseX >= 164 && MouseY >= 364 && MouseX <= 439 && MouseY <= 425) {
+                    resetGame();        // Reset trò chơi khi game over
+                    isWaiting = false;  // Bắt đầu trò chơi ngay
+                    buttonSound.play();
+                }
+                else if (MouseX >= 164 && MouseY >= 458 && MouseX <= 439 && MouseY <= 519) {
+                    window.close();  // Thoát trò chơi
+                    buttonSound.play();
+                }
             }
 
             if (e.type == Event::KeyPressed) {
@@ -190,21 +230,6 @@ int main() {
                     startSound.play();
                     buttonSound.play();
                 }
-                else if (isPaused && e.key.code == Keyboard::Enter) {
-                    countdownActive = true; // Kích hoạt đếm ngược
-                    countdownTime = 3.0f;   // Đặt lại thời gian đếm ngược
-                    countdownClock.restart(); // Khởi động đồng hồ đếm ngược
-                    buttonSound.play();
-                }
-                else if (!isplaying && e.key.code == Keyboard::Enter) {
-                    resetGame();        // Reset trò chơi khi game over
-                    isWaiting = false;  // Bắt đầu trò chơi ngay
-                    buttonSound.play();
-                }
-                else if (!isplaying && e.key.code == Keyboard::Escape) {
-                    window.close();  // Thoát trò chơi
-                    buttonSound.play();
-                }
 
                 if (!isPaused && isplaying) {
                     if (e.key.code == Keyboard::Up) {
@@ -213,19 +238,6 @@ int main() {
                     }
                     else if (e.key.code == Keyboard::Left) dx = -1;
                     else if (e.key.code == Keyboard::Right) dx = 1;
-                }
-
-                if (isPaused) {
-                    if (e.key.code == Keyboard::F) {
-                        isMusicOn = !isMusicOn; // Đảo ngược trạng thái âm nhạc (bật <-> tắt)
-                        if (isMusicOn) {
-                            backgroundMusic.play();   // Bật nhạc
-                        }
-                        else {
-                            backgroundMusic.pause();  // Tắt nhạc
-                        }
-                        buttonSound.play();
-                    }
                 }
             }
 
@@ -289,7 +301,7 @@ int main() {
             countdownClock.restart();
 
             if (countdownTime <= 0) {
-                countdownTime = 0;
+                countdownTime = 0; // Đảm bảo để không bị âm
                 countdownActive = false; // Kết thúc đếm ngược
                 isPaused = false; // Chỉ kết thúc Pause sau khi đếm ngược hoàn thành
             }
@@ -344,10 +356,10 @@ int main() {
             }
 
             // Tăng mảnh xuống dần theo thời gian
-            if (timer > delay) {
+            if (timer > delay) { //Kiểm tra xem đã đến thời điểm để di chuyển mảnh xuống chưa
                 for (int i = 0; i < 4; i++) {
-                    b[i] = a[i];
-                    a[i].y += 1;
+                    b[i] = a[i]; // Lưu lại vị trí hiện tại của mảnh
+                    a[i].y += 1; // Di chuyển mảnh xuống một ô
                 }
 
                 if (!check()) {
@@ -361,8 +373,11 @@ int main() {
                     nextPiece = rand() % 7; // Cập nhật mảnh tiếp theo
 
                     int n = currentPiece;
+
+                    int offsetXForPiece = N / 2 - 1;
+
                     for (int i = 0; i < 4; i++) {
-                        a[i].x = figures[n][i] % 2;
+                        a[i].x = figures[n][i] % 2 + offsetXForPiece;
                         a[i].y = figures[n][i] / 2;
                     }
 
@@ -400,22 +415,16 @@ int main() {
         window.draw(background);
 
         if (isWaiting) {
-            window.clear(Color::Black);
+            window.clear();
+            window.draw(waitingSprite);  // Hiển thị ảnh nền màn hình chờ
 
             Font font;
-            if (!font.loadFromFile("../data/MCR.ttf")) {
+            if (!font.loadFromFile("../data/mine.ttf")) {
                 // Xử lý lỗi
             }
-
-            Text title("TETRIS", font, 100);
-            title.setFillColor(Color::White);
-            title.setPosition(140, 150);
-
-            Text instruction("Press ENTER to Start", font, 35);
+            Text instruction("PRESS ENTER TO START", font, 25);
             instruction.setFillColor(Color::White);
-            instruction.setPosition(125, 400);
-
-            window.draw(title);
+            instruction.setPosition(135, 350);
             window.draw(instruction);
         }
         else if (isPaused) {
@@ -432,18 +441,19 @@ int main() {
                 window.draw(countdownText);
             }
             else {
-                window.clear(Color::Black);
+                window.clear();
+                window.draw(pauseSprite);  // Hiển thị ảnh nền màn hình chờ
 
-                Text title("PAUSE", font, 100);
-                title.setFillColor(Color::White);
-                title.setPosition(170, 150);
-
-                Text instruction("  Press ENTER to Resume\n\n  Press R to Restart\n\n  Press F to Toggle Music", font, 35);
+                Text instruction("Resume", font, 44);
                 instruction.setFillColor(Color::White);
-                instruction.setPosition(90, 400);
+                instruction.setPosition(219, 263);
 
-                window.draw(title);
+                Text Restart("Restart", font, 44);
+                Restart.setFillColor(Color::White);
+                Restart.setPosition(212, 358);
+
                 window.draw(instruction);
+                window.draw(Restart);
 
                 // Hiển thị trạng thái âm nhạc (On/Off)
                 Text musicStatus;
@@ -454,25 +464,26 @@ int main() {
                     musicStatus.setString("Music: OFF");
                 }
                 musicStatus.setFont(font);
-                musicStatus.setCharacterSize(35);
+                musicStatus.setCharacterSize(40);
                 musicStatus.setFillColor(Color::White);
-                musicStatus.setPosition(100, 600);
+                musicStatus.setPosition(211, 452);
                 window.draw(musicStatus);
             }
         }
         else if (!isplaying) {
-            window.clear(Color::Black);
+            window.clear();
+            window.draw(GOSprite);
 
-            Text title("GAME OVER", font, 100);
-            title.setFillColor(Color::Red);
-            title.setPosition(60, 150);
+            Text instruction("RESTART", font, 44);
+            instruction.setFillColor(Color::White);
+            instruction.setPosition(212, 366);
 
-            Text instruction("  Press Enter to Restart\n\n  Press ESC to Exit", font, 35);
-            instruction.setFillColor(Color::Red);
-            instruction.setPosition(90, 400);
+            Text exit("EXIT", font, 44);
+            exit.setFillColor(Color::White);
+            exit.setPosition(255, 462);
 
-            window.draw(title);
             window.draw(instruction);
+            window.draw(exit);
         }
         else {
             // Vẽ các khối
@@ -540,6 +551,5 @@ int main() {
 
         window.display();
     }
-
     return 0;
 }
